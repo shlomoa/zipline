@@ -66,6 +66,7 @@ from zipline.gens.tradesimulation import AlgorithmSimulator
 from zipline.sources import DataFrameSource, DataPanelSource
 from zipline.transforms.utils import StatefulTransform
 from zipline.utils.api_support import ZiplineAPI, api_method
+
 import zipline.utils.events
 from zipline.utils.events import (
     EventManager,
@@ -518,6 +519,7 @@ class TradingAlgorithm(object):
     def get_environment(self):
         return self._environment
 
+    @api_method
     def add_event(self, rule=None, callback=None):
         """
         Adds an event to the algorithm's EventManager.
