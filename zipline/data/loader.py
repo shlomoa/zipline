@@ -374,3 +374,112 @@ def load_bars_from_yahoo(indexes=None,
             for col in adj_cols:
                 panel[ticker][col] *= ratio_filtered
     return panel
+
+
+def _raw_csv_data(data_path=None, indexes=None, stocks=None, start=None, end=None):
+    """Load from csv file (using the yahoo format).
+    Expected format:
+
+        Date,Open,High,Low,Close,Volume,Adj Close
+        2011-01-03,325.64,330.26,324.84,329.57,111284600,44.59
+        2011-01-04,332.44,332.5,328.15,331.29,77270200,44.82
+
+
+
+    :Optional:
+        indexes : dict (Default: {'SPX': '^GSPC'})
+            Financial indexes to load.
+        stocks : list (Default: ['AAPL', 'GE', 'IBM', 'MSFT',
+                                 'XOM', 'AA', 'JNJ', 'PEP', 'KO'])
+            Stock closing prices to load.
+        start : datetime (Default: datetime(1993, 1, 1, 0, 0, 0, 0, pytz.utc))
+            Retrieve prices from start date on.
+        end : datetime (Default: datetime(2002, 1, 1, 0, 0, 0, 0, pytz.utc))
+            Retrieve prices until end date.
+
+        data_path: is the path in which the csv files are expected to be, for example AAPL.csv
+
+    :Note:
+        This is based on code presented in a talk by Wes McKinney:
+        http://wesmckinney.com/files/20111017/notebook_output.pdf
+    """
+    assert data_path is not None, "must specify csv file path"
+    assert indexes is not None or stocks is not None, """
+must specify stocks or indexes"""
+
+    if start is None:
+        start = pd.datetime(1990, 1, 1, 0, 0, 0, 0, pytz.utc)
+
+    if start is not None and end is not None:
+        assert start < end, "start date is later than end date."
+
+    data = OrderedDict()
+    # TODO add dates support
+    if stocks is not None:
+        for stock in stocks:
+            file_path = data_path + '/' + stock + '.csv'
+            if os.path.exists(file_path):
+                stkd = pd.DataFrame.from_csv(file_path)
+                data[stock] = stkd
+            else:
+                print "no such file:",file_path
+
+    if indexes is not None:
+        for name, ticker in iteritems(indexes):
+            file_path = data_path + '/' + ticker + '.csv'
+            if os.path.exists(file_path):
+                stkd = pd.DataFrame.from_csv(file_path)
+                data[name] = stkd
+            else:
+                print "no such file:",file_path
+    return data
+
+
+def load_bars_from_csv(data_path=None,
+                         indexes=None,
+                         stocks=None,
+                         start=None,
+                         end=None,
+                         adjusted=True):
+    """
+    Loads data from csv file into a panel with the following
+    column names for each indicated security:
+
+        - open
+        - high
+        - low
+        - close
+        - volume
+        - price
+
+    Note that 'price' is Yahoo's 'Adjusted Close', which removes the
+    impact of splits and dividends. If the argument 'adjusted' is True, then
+    the open, high, low, and close values are adjusted as well.
+
+    :param indexes: Financial indexes to load.
+    :type indexes: dict
+    :param stocks: Stock closing prices to load.
+    :type stocks: list
+    :param start: Retrieve prices from start date on.
+    :type start: datetime
+    :param end: Retrieve prices until end date.
+    :type end: datetime
+    :param adjusted: Adjust open/high/low/close for splits and dividends.
+        The 'price' field is always adjusted.
+    :type adjusted: bool
+
+    """
+    data = _raw_csv_data(data_path, indexes, stocks, start, end)
+    panel = pd.Panel(data)
+    # Rename columns
+    panel.minor_axis = ['open', 'high', 'low', 'close', 'volume', 'price']
+    panel.major_axis = panel.major_axis.tz_localize(pytz.utc)
+    # Adjust data
+    if adjusted:
+        adj_cols = ['open', 'high', 'low', 'close']
+        for ticker in panel.items:
+            ratio = (panel[ticker]['price'] / panel[ticker]['close'])
+            ratio_filtered = ratio.fillna(0).values
+            for col in adj_cols:
+                panel[ticker][col] *= ratio_filtered
+    return panel
